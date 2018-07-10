@@ -1,3 +1,4 @@
+import secrets
 from application import mongodb
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -13,20 +14,28 @@ class User(object):
         self.email = None
         self.password = None
         self.password_hash = None
+        self.api_key = None
 
     @staticmethod
     def _hash_password(password):
         return generate_password_hash(password)
 
-    def check_password(self, email, password):
-        return check_password_hash(self.user.findOne({'email': email}, {'_id': 0, 'password': 1}), password)
+    @staticmethod
+    def _generate_key():
+        return secrets.token_urlsafe(64)
+
+    def verify_key(self, client_key):
+        return self.user.find({'api_key': client_key}, {'_id': 1})
 
     def validate_email(self, email):
         return self.user.find({'email': email})
 
     def add_user(self, firstname=None, lastname=None, email=None, password=None):
+        self.api_key = self._generate_key()
         self.user.insert({'firstname': firstname, 'lastname': lastname, 'email': email,
-                          'password': self._hash_password(password)})
+                          'password': self._hash_password(password), 'api_key': self.api_key})
+        return self.api_key
 
     def update_user(self, email, password):
-        self.user.update({'email': email}, {'$set': {'password': password}}, upsert=False)
+        self.user.update({'email': email}, {'$set': {'password': password,
+                                                     'api_key': self._generate_key()}}, upsert=False)
