@@ -25,7 +25,10 @@ class User(object):
         return secrets.token_urlsafe(64)
 
     def verify_key(self, client_key):
-        return self.user.find({'api_key': client_key}, {'_id': 1})
+        return self.user.find({'api_key': client_key}).count()
+
+    def get_user_id(self, client_key):
+        return list(self.user.find({'api_key': client_key}, {'_id': 1}))[0]['_id']
 
     def validate_email(self, email):
         return self.user.find({'email': email})

@@ -1,5 +1,7 @@
 from application import mongodb, app
 from yelpapi import YelpAPI
+import datetime
+
 
 class YelpData(object):
     """
@@ -12,11 +14,17 @@ class YelpData(object):
         self.business_match = mongodb.db.business_match
         self.business_details = mongodb.db.business_details
         self.business_reviews = mongodb.db.business_reviews
+        self.yelp_req = mongodb.db.yelp_request
         self.yelp_api = YelpAPI(app.config['YELP_API_KEY'])
-        self.business_id = None
         self.response = None
 
-    def get_business_match_data(self, name=None, address1='', address2=None, address3=None, city=None, state=None,
+    @staticmethod
+    def _remove_keys(json_data):
+        del json_data['user_id']
+        del json_data['_id']
+        return json_data
+
+    def get_business_match_data(self, user_id=None, name=None, address1='', address2=None, address3=None, city=None, state=None,
                                 country=None, latitude=None, longitude=None, phone=None, zip_code=None,
                                 yelp_business_id=None, limit=1, match_threshold='default'):
         """
@@ -32,17 +40,26 @@ class YelpData(object):
                                                            latitude=latitude, longitude=longitude, phone=phone,
                                                            zip_code=zip_code, yelp_business_id=yelp_business_id,
                                                            limit=limit, match_threshold=match_threshold)
-        # self.business_match.insert(self.response)
-        print(self.response)
-        # self.business_id = dict(self.response)['id']
+        self.response['user_id'] = user_id
+        self.business_match.insert_one(self.response)
+        self.response = self._remove_keys(self.response)
         return self.response
 
-    def get_business_details(self):
-        self.response = self.yelp_api.business_query(id=self.business_id)
-        self.business_details.insert(self.response)
+    def get_business_details(self, business_id, user_id):
+        self.response = self.yelp_api.business_query(id=business_id)
+        self.response['user_id'] = user_id
+        self.business_details.insert_one(self.response)
+        self.response = self._remove_keys(self.response)
         return self.response
 
-    def get_business_reviews(self):
+    def get_business_reviews(self, business_id, user_id):
         self.response = self.yelp_api.reviews_query(id=self.business_id)
-        self.business_reviews.insert(self.response)
+        self.response['user_id'] = user_id
+        self.business_reviews.insert_one(self.response)
+        self.response = self._remove_keys(self.response)
         return self.response
+
+    def yelp_request(self, yelp_request, user_id):
+        yelp_request['req_datetime'] = datetime.datetime.now()
+        yelp_request['user_id'] = user_id
+        return self.yelp_req.insert_one(yelp_request).acknowledged
